@@ -5,7 +5,7 @@ Easy to configure image saver for E-Paper dislays
 The server is answering a JSON to each of its endpoints with the corresponding image encoded for the E-ink screen.
 It can send back (X,Y) coordinate to offload all heavy computation from the micro-controler.
 
-## Installi
+## Install
 ```
 python3 -m venv venv
 source venv/bin/activate
