@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 from flask import Response
 from app import app
-from PIL import Image
+from wand.image import Image
 from random import random
 import binascii
 import json
 import requests
 
 
-def imageToByteArray(imageName, blackThreshold):
+def imageToByteArray(imageName, newSize=None):
     """ Convert an image to a Waveshare compatible byte array
 
         :imageName:      'path/name' to the image
-        :blackThreshold: Threshold of R+G+B colors to consider a black pixel
 
         :return: {
                     'image': bytearray(imageName),
@@ -20,32 +19,37 @@ def imageToByteArray(imageName, blackThreshold):
                     'h': Image height
                  }
     """
-    # Open image & load it
-    im = Image.open(imageName)
-    pix = im.load()
-    # Create resulting byte array
-    buffer = bytearray((im.size[0] // 8) * im.size[1])
-    i = 0
-    # Loop on image
-    for y in range(im.size[1]):
-        # 8 by 8 as 1 bit = 1 pixel in resulting array
-        for x in range(im.size[0] // 8):
-            byte = 0
-            for bit in range(8):
-                pixel = pix[x * 8 + bit, y]
-                if pixel[0] + pixel[1] + pixel[2] > blackThreshold:
-                    byte |= (1 << (7-bit))
-            # print('i: {}, x: {}, y: {} - {} - 0x{:02x}'.format(i,x*8+bit,y,pixel[0] + pixel[1] + pixel[2],byte))
-            buffer[i] = byte
-            i += 1
-        # print('Line {}/{} - 0x{:02x}'.format(y+1, im.size[1], byte))
-    # print('Image:', buffer)
-    return {
-            'image': buffer,
-            'w': im.size[0],
-            'h': im.size[1]
-           }
+    bufferIndex = 0
+    byteIndex = 0
+    byte = 0
 
+    with Image(filename=imageName) as img:
+        if newSize:
+            # TODO - Enter X, compute Y to keep scale. Only X must be multiple of 8
+            img.resize(newSize[0], newSize[1])
+
+        # Create resulting byte array
+        buffer = bytearray((img.width // 8) * img.height*2)
+
+        for row in img:
+            for col in row:
+                # print('Col: {}  -  alpha: {}'.format(col, col.alpha_int8))
+                if col.alpha < 0.2:
+                    byte |= (1 << (7-byteIndex))
+                byteIndex += 1
+                if byteIndex == 8:
+                    byteIndex = 0
+                    buffer[bufferIndex] = byte
+                    bufferIndex += 1
+                    byte = 0
+                    # print(bufferIndex)
+
+        return {
+                'image': buffer,
+                'w': img.width,
+                'h': img.height
+            }
+    return {}
 
 @app.route('/weather', methods=['GET'])
 def index():
@@ -53,11 +57,11 @@ def index():
 
         :return: Index template
     """
-    # Black threshold (255*3)/2
-    data = imageToByteArray('test.png', 382)
+    data = imageToByteArray('ressources/weather/tsra.svg', (104,104))
     data['image'] = binascii.hexlify(data['image']).decode('utf8')
     data['x'] = int(random() * 200)
     data['y'] = int(random() * 50)
+    # print('data:', data)
     resp = Response(json.dumps(data))
     resp.headers['content-type'] = 'application/json'
     return resp

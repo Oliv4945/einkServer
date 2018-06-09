@@ -1,4 +1,4 @@
 flask
-Pillow
 pygame
 requests
+wand
