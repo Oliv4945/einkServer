@@ -7,6 +7,7 @@ from wand.font import Font
 from wand.image import Image
 from random import random
 import binascii
+import datetime
 import json
 import requests
 
@@ -92,33 +93,49 @@ def imageToByteArray(img):
             'h': img.height
         }
 
-    with Image(filename=imageName) as img:
-        if newSize:
-            # TODO - Enter X, compute Y to keep scale. Only X must be multiple of 8
-            img.resize(newSize[0], newSize[1])
 
-        # Create resulting byte array
-        buffer = bytearray((img.width // 8) * img.height*2)
-
-        for row in img:
-            for col in row:
-                # print('Col: {}  -  alpha: {}'.format(col, col.alpha_int8))
-                if col.alpha < 0.2:
-                    byte |= (1 << (7-byteIndex))
-                byteIndex += 1
-                if byteIndex == 8:
-                    byteIndex = 0
-                    buffer[bufferIndex] = byte
-                    bufferIndex += 1
-                    byte = 0
-                    # print(bufferIndex)
-
-        return {
-                'image': buffer,
-                'w': img.width,
-                'h': img.height
+def fillForecastFromOWM(data):
+    """ Return a dict of forecast values
+    
+        :data: Input OpenWeatherMap data
+        :return: {'dt_txt': '2018-06-11 15:00:00', 'clouds': 76, 'temperature': 20.0, 'weather': 'Rain'}
+    """
+    iconConv = {
+                    '01d': 'skc',
+                    '02d': 'sct',
+                    '03d': 'ovc',
+                    '04d': 'ovc',
+                    '09d': 'ra',
+                    '10d': 'shra',
+                    '11d': 'tsra',
+                    '13d': 'sn',
+                    '50d': 'fg',
+    }
+    return {
+                'dt_txt': data['dt_txt'],
+                'weather': data['weather'][0]['main'],
+                'clouds': data['clouds']['all'],
+                'temperature': round(data['main']['temp'], 1),
+                'icon': iconConv[data['weather'][0]['icon']]
             }
-    return {}
+
+
+def getWeatherFromOWM(cityCode, appId):
+    print('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
+    r = requests.get('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
+    r = r.json()
+    # TODO - Error handling
+    
+    # Parse data for morning & afternoon
+    forecast = {'am': None, 'pm': None}
+    date = datetime.datetime.now().strftime('%Y-%m-%d')
+    for item in r['list']:
+        if '{} 09:00:00'.format(date) in item['dt_txt']:
+            forecast['am'] = fillForecastFromOWM(item)
+        if '{} 15:00:00'.format(date) in item['dt_txt']:
+            forecast['pm'] = fillForecastFromOWM(item)
+    return forecast
+
 
 @app.route('/weather', methods=['GET'])
 def index():
@@ -126,7 +143,9 @@ def index():
 
         :return: Index template
     """
-    data = imageToByteArray('ressources/weather/tsra.svg', (104,104))
+    forecast = getWeatherFromOWM(2994087, 'OWM_API_KEY')
+    # print('WHEATHER - Forecast:', forecast)
+    data = tileWeather(forecast['pm'], (128, 200), 104, 25)
     data['image'] = binascii.hexlify(data['image']).decode('utf8')
     data['x'] = int(random() * 200)
     data['y'] = int(random() * 50)
