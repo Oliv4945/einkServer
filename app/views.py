@@ -53,7 +53,6 @@ def tileWeather(data, tileSize, imgWidth, textSize):
             #             right = int(tileSize[0] * 3/100)
             #         )
             #     draw(tile)
-            print('cloudBarH OK')
         with tile.convert('png') as tbc:
             tbc.save(filename='test.png')
         return imageToByteArray(tile)
@@ -78,8 +77,8 @@ def imageToByteArray(img):
     buffer = bytearray((img.width // 8) * img.height*2)
     for row in img:
         for col in row:
-            if (col.red != col.green) or (col.red != col.blue) or (col.blue != col.green):
-                print('Col: {}  -  {}-{}-{}-{}'.format(col, col.red, col.green, col.blue, col.alpha))
+            # if (col.red != col.green) or (col.red != col.blue) or (col.blue != col.green):
+            #     print('Col: {}  -  {}-{}-{}-{}'.format(col, col.red, col.green, col.blue, col.alpha))
             if col.red + col.green + col.blue > 2:
                 byte |= (1 << (7-byteIndex))
             byteIndex += 1
@@ -124,35 +123,57 @@ def fillForecastFromOWM(data):
 
 
 def getWeatherFromOWM(cityCode, appId):
-    print('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
+    # print('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
     r = requests.get('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
     r = r.json()
     # TODO - Error handling
     
     # Parse data for morning & afternoon
     forecast = {'am': None, 'pm': None}
-    date = datetime.datetime.now().strftime('%Y-%m-%d')
+    date = datetime.datetime.now()
+    if date.hour > 9:
+        dateAM = (date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    if date.hour > 15:
+        datePM = (date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
     for item in r['list']:
-        if '{} 09:00:00'.format(date) in item['dt_txt']:
+        if '{} 09:00:00'.format(dateAM) in item['dt_txt']:
             forecast['am'] = fillForecastFromOWM(item)
-        if '{} 15:00:00'.format(date) in item['dt_txt']:
+        if '{} 15:00:00'.format(datePM) in item['dt_txt']:
             forecast['pm'] = fillForecastFromOWM(item)
     return forecast
 
 
-@app.route('/weather', methods=['GET'])
+@app.route('/page', methods=['GET'])
+def page():
+    index = request.args.get('index', default = None, type = int)
+    # TODO - Error handling
+    resp = Response(json.dumps(screen[index-1]))
+    resp.headers['content-type'] = 'application/json'
+    return resp
+
+
+@app.route('/screen', methods=['GET'])
 def index():
     """ Return index template
 
         :return: Index template
     """
+    # Empty screen list
+    del screen[:]
     forecast = getWeatherFromOWM(2994087, 'OWM_API_KEY')
     # print('WHEATHER - Forecast:', forecast)
-    data = tileWeather(forecast['pm'], (128, 200), 104, 25)
+    data = tileWeather(forecast['pm'], (104, 160), 104, 25)
     data['image'] = binascii.hexlify(data['image']).decode('utf8')
-    data['x'] = int(random() * 200)
-    data['y'] = int(random() * 50)
-    # print('data:', data)
-    resp = Response(json.dumps(data))
+    data['x'] = 400-104-5
+    data['y'] = 5
+    data['index'] = 1
+    screen.append(data)
+    data = tileWeather(forecast['am'], (104, 160), 104, 25)
+    data['image'] = binascii.hexlify(data['image']).decode('utf8')
+    data['x'] = 400-104*2-5-10
+    data['y'] = 5
+    data['index'] = 2
+    screen.append(data)
+    resp = Response(json.dumps([1, 2]))
     resp.headers['content-type'] = 'application/json'
     return resp
