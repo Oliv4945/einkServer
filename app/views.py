@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Response
+from flask import Response, request
 from app import app
 from wand.color import Color
 from wand.drawing import Drawing
@@ -10,6 +10,8 @@ import binascii
 import datetime
 import json
 import requests
+
+screen = []
 
 
 def tileWeather(data, tileSize, imgWidth, textSize):
@@ -42,15 +44,16 @@ def tileWeather(data, tileSize, imgWidth, textSize):
                     gravity = 'south'
                     )
             # Cloud bargraph
-            cloudBarH = int(tileSize[1] * data['clouds'] / 100)
-            with Drawing() as draw:
-                draw.rectangle(
-                        top = tileSize[1] - cloudBarH,
-                        height = cloudBarH,
-                        left = 0,
-                        right = int(tileSize[0] * 3/100)
-                    )
-                draw(tile)
+            # cloudBarH = int(tileSize[1] * data['clouds'] / 100)
+            # with Drawing() as draw:
+            #     draw.rectangle(
+            #             top = tileSize[1] - cloudBarH,
+            #             height = cloudBarH,
+            #             left = 0,
+            #             right = int(tileSize[0] * 3/100)
+            #         )
+            #     draw(tile)
+            print('cloudBarH OK')
         with tile.convert('png') as tbc:
             tbc.save(filename='test.png')
         return imageToByteArray(tile)
