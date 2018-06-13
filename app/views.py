@@ -134,8 +134,12 @@ def getWeatherFromOWM(cityCode, appId):
     date = datetime.datetime.now()
     if date.hour > 9:
         dateAM = (date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    else:
+        dateAM = date.strftime('%Y-%m-%d')
     if date.hour > 15:
         datePM = (date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    else:
+        datePM = date.strftime('%Y-%m-%d')
     for item in r['list']:
         if '{} 09:00:00'.format(dateAM) in item['dt_txt']:
             forecast['am'] = fillForecastFromOWM(item)
