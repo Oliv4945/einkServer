@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from config import API_KEY_HASS, API_KEY_OWM
 from flask import Response, request
 from app import app
 from wand.color import Color
@@ -160,7 +161,7 @@ def index():
     """
     # Empty screen list
     del screen[:]
-    forecast = getWeatherFromOWM(2994087, 'OWM_API_KEY')
+    forecast = getWeatherFromOWM(2994087, API_KEY_OWM)
     # print('WHEATHER - Forecast:', forecast)
     data = tileWeather(forecast['pm'], (104, 160), 104, 25)
     data['image'] = binascii.hexlify(data['image']).decode('utf8')
