@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from config import API_KEY_HASS, API_KEY_OWM
+from config import API_KEY_HASS, API_KEY_OWM, SERVER_URL
 from flask import Response, request
 from app import app
 from wand.color import Color
@@ -12,7 +12,45 @@ import datetime
 import json
 import requests
 
+# Global variable, shared between fonctions
 screen = []
+
+
+def tileFloorplanFromHass():
+    data = [
+            {'entityId': 'sensor.bedroom_temperature',            'x': 65, 'y': 12},
+            {'entityId': 'sensor.bedroomnoe_temperature',         'x': 5,  'y': 69  },
+            {'entityId': 'sensor.biviers_outside_temperature',    'x': 167, 'y': 8 },
+            {'entityId': 'sensor.biviers_livingroom_temperature', 'x': 138, 'y': 51  },
+           ]
+    
+    headers = {'x-ha-access': API_KEY_HASS,
+           'content-type': 'application/json'
+           }
+    with Image(filename='ressources/floorplan.png') as tile:
+        tile.font = Font(
+            path = 'virtualenv/lib/python3.4/site-packages/pygame/freesansbold.ttf',
+            color = Color('black'),
+            size = 14
+            )
+        # Fetch data and display them
+        for room in data:
+            r = requests.get('{}/api/states/{}'.format(SERVER_URL, room['entityId']), headers=headers)
+            if r.status_code == 200:
+                r = r.json()
+                room['state'] = r['state']
+                room['unit']  = r['attributes']['unit_of_measurement']
+                # Add values
+                tile.caption(
+                    '{}{}'.format(r['state'],r['attributes']['unit_of_measurement']),
+                    left = room['x'],
+                    top  = room['y']
+                    )
+        with tile.convert('png') as tbc:
+            tbc.save(filename='tileHass.png')
+        # Display it
+        return imageToByteArray(tile)
+    return {}
 
 
 def tileWeather(data, tileSize, imgWidth, textSize):
@@ -124,7 +162,6 @@ def fillForecastFromOWM(data):
 
 
 def getWeatherFromOWM(cityCode, appId):
-    # print('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
     r = requests.get('https://api.openweathermap.org/data/2.5/forecast?id={}&APPID={}&units={}'.format(cityCode, appId, 'metric'))
     r = r.json()
     # TODO - Error handling
@@ -152,7 +189,7 @@ def getWeatherFromOWM(cityCode, appId):
 def page():
     index = request.args.get('index', default = None, type = int)
     # TODO - Error handling
-    resp = Response(json.dumps(screen[index-1]))
+    resp = Response(json.dumps(screen[index]))
     resp.headers['content-type'] = 'application/json'
     return resp
 
@@ -165,6 +202,7 @@ def index():
     """
     # Empty screen list
     del screen[:]
+    # ****    Weather    ****
     forecast = getWeatherFromOWM(2994087, API_KEY_OWM)
     # print('WHEATHER - Forecast:', forecast)
     data = tileWeather(forecast['pm'], (104, 160), 104, 25)
@@ -179,6 +217,14 @@ def index():
     data['y'] = 5
     data['index'] = 2
     screen.append(data)
-    resp = Response(json.dumps([1, 2]))
+    # ****    HASS    ****
+    data = tileFloorplanFromHass()
+    data['image'] = binascii.hexlify(data['image']).decode('utf8')
+    data['x'] = 10
+    data['y'] = 170
+    data['index'] = 3
+    screen.append(data)
+    print('Range:', [i for i in range(len(screen))])
+    resp = Response(json.dumps([i for i in range(len(screen))]))
     resp.headers['content-type'] = 'application/json'
     return resp

@@ -10,3 +10,4 @@ SECRET_KEY = 'A-long-enough-random-key'
 # API Keys
 API_KEY_HASS = 'Home assistant API key'
 API_KEY_OWM = 'OpenWeatherMap API key'
+SERVER_URL = 'https://server.net:IP'
